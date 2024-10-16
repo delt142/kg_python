@@ -1,155 +1,194 @@
+import pygame
+from pygame.locals import *
+from OpenGL.GL import *
+from OpenGL.GLU import *
+import numpy as np
 
-import pygame  # Импортируем библиотеку Pygame для работы с графикой и событиями
-from pygame.locals import *  # Импортируем все локальные константы из Pygame, такие как клавиши и события
-from OpenGL.GL import *  # Импортируем функции OpenGL для отрисовки 3D-объектов
-from OpenGL.GLU import *  # Импортируем утилиты OpenGL для работы с перспективой и другими функциями
-import numpy as np  # Импортируем NumPy для работы с массивами и матрицами
 
-# Определение вершин и граней куба
 vertices = [
-    [1, 1, -1], [1, -1, -1], [-1, -1, -1], [-1, 1, -1],  # Задание вершин задней грани
-    [1, 1, 1], [1, -1, 1], [-1, -1, 1], [-1, 1, 1]  # Задание вершин передней грани
+    [1, 1, -1], [1, -1, -1], [-1, -1, -1], [-1, 1, -1],
+    [1, 1, 1], [1, -1, 1], [-1, -1, 1], [-1, 1, 1]
 ]
-edges = [  # Определение рёбер куба
+edges = [
     (0, 1), (1, 2), (2, 3), (3, 0),
     (4, 5), (5, 6), (6, 7), (7, 4),
     (0, 4), (1, 5), (2, 6), (3, 7)
 ]
-faces = [  # Определение граней куба
+faces = [
     (0, 1, 2, 3), (3, 2, 6, 7),
     (7, 6, 5, 4), (4, 5, 1, 0),
     (1, 5, 6, 2), (4, 0, 3, 7)
 ]
-colors = [  # Определение цветов для каждой грани куба
-    (1, 0, 0), (0, 1, 0), (0, 0, 1),
-    (1, 1, 0), (1, 0, 1), (0, 1, 1)
+colors = [
+    (1, 0, 0), (0, 1, 0), (0, 0, 1),#задняя часть лево перед
+    (1, 0, 1), (16, 10, 100), (1, 1, 1)#право низ  вверх
 ]
 
-# Функция для создания матрицы трансляции
+
 def create_translation_matrix(tx, ty, tz):
-    return np.array([  # Возвращаем 4x4 матрицу трансляции
+    return np.array([
         [1, 0, 0, tx],
         [0, 1, 0, ty],
         [0, 0, 1, tz],
         [0, 0, 0, 1]
     ])
 
-# Функция для создания матрицы масштабирования
+
 def create_scaling_matrix(sx, sy, sz):
-    return np.array([  # Возвращаем 4x4 матрицу масштабирования
+    return np.array([
         [sx, 0, 0, 0],
         [0, sy, 0, 0],
         [0, 0, sz, 0],
         [0, 0, 0, 1]
     ])
 
-# Функция для создания матрицы вращения
 def create_rotation_matrix(angle, ax, ay, az):
-    rad = np.radians(angle)  # Преобразование угла из градусов в радианы
-    c, s = np.cos(rad), np.sin(rad)  # Вычисление косинуса и синуса угла
-    return np.array([  # Возвращаем 4x4 матрицу вращения
+    rad = np.radians(angle)
+    c, s = np.cos(rad), np.sin(rad)
+    return np.array([
         [c + (1 - c) * ax * ax, (1 - c) * ax * ay - s * az, (1 - c) * ax * az + s * ay, 0],
         [(1 - c) * ay * ax + s * az, c + (1 - c) * ay * ay, (1 - c) * ay * az - s * ax, 0],
         [(1 - c) * az * ax - s * ay, (1 - c) * az * ay + s * ax, c + (1 - c) * az * az, 0],
         [0, 0, 0, 1]
     ])
 
-# Функция для рисования координатных осей
 def draw_axes():
-    glBegin(GL_LINES)  # Начинаем рисование линий
-    # Ось X (красный)
-    glColor3fv((1, 0, 0))  # Устанавливаем цвет для оси X
-    glVertex3f(-10, 0, 0)  # Начало линии оси X
-    glVertex3f(10, 0, 0)   # Конец линии оси X
-    # Ось Y (зеленый)
-    glColor3fv((0, 1, 0))  # Устанавливаем цвет для оси Y
-    glVertex3f(0, -10, 0)  # Начало линии оси Y
-    glVertex3f(0, 10, 0)   # Конец линии оси Y
-    # Ось Z (синий)
-    glColor3fv((0, 0, 1))  # Устанавливаем цвет для оси Z
-    glVertex3f(0, 0, -10)  # Начало линии оси Z
-    glVertex3f(0, 0, 10)   # Конец линии оси Z
-    glEnd()  # Завершаем рисование линий
+    glBegin(GL_LINES)
+    glColor3fv((1, 0, 0))
+    glVertex3f(-10, 0, 0)
+    glVertex3f(10, 0, 0)
+    glColor3fv((0, 1, 0))
+    glVertex3f(0, -10, 0)
+    glVertex3f(0, 10, 0)
+    glColor3fv((0, 0, 1))
+    glVertex3f(0, 0, -10)
+    glVertex3f(0, 0, 10)
+    glEnd()
 
-# Функция для рисования куба с трансформацией
+
+def create_perspective_matrix(fov, aspect_ratio, near, far):
+    """Создаем ручную матрицу перспективы"""
+    f = 1.0 / np.tan(np.radians(fov) / 2)
+    return np.array([
+        [f / aspect_ratio, 0, 0, 0],
+        [0, f, 0, 0],
+        [0, 0, (far + near) / (near - far), (2 * far * near) / (near - far)],
+        [0, 0, -1, 0]
+    ], dtype=float)
+# def draw_cuboid(scaling, position, rotation):
+#     translation_matrix = create_translation_matrix(*position)
+#     scaling_matrix = create_scaling_matrix(*scaling)
+#     rotation_x_matrix = create_rotation_matrix(rotation[0], 1, 0, 0)
+#     rotation_y_matrix = create_rotation_matrix(rotation[1], 0, 1, 0)
+#     rotation_z_matrix = create_rotation_matrix(rotation[2], 0, 0, 1)
+#     transformation_matrix = np.matmul(translation_matrix,
+#                                       np.matmul(rotation_z_matrix, np.matmul(rotation_y_matrix, np.matmul(rotation_x_matrix, scaling_matrix))))
+#
+#     glPushMatrix()
+#     glMultMatrixf(transformation_matrix.T)
+#     glEnable(GL_DEPTH_TEST)
+#     glBegin(GL_QUADS)
+#     for i, face in enumerate(faces):
+#         glColor3fv(colors[i])
+#         for vertex in face:
+#             glVertex3fv(vertices[vertex])
+#     glEnd()
+#
+#     glBegin(GL_LINES)
+#     for edge in edges:
+#         for vertex in edge:
+#             glVertex3fv(vertices[vertex])
+#     glEnd()
+#
+#     glPopMatrix()
+
+
 def draw_cuboid(scaling, position, rotation):
-    # Создание матриц трансформации
-    translation_matrix = create_translation_matrix(*position)  # Создание матрицы трансляции
-    scaling_matrix = create_scaling_matrix(*scaling)  # Создание матрицы масштабирования
-    rotation_x_matrix = create_rotation_matrix(rotation[0], 1, 0, 0)  # Вращение вокруг оси X
-    rotation_y_matrix = create_rotation_matrix(rotation[1], 0, 1, 0)  # Вращение вокруг оси Y
-    rotation_z_matrix = create_rotation_matrix(rotation[2], 0, 0, 1)  # Вращение вокруг оси Z
+    # Создаем матрицы трансформации
+    translation_matrix = create_translation_matrix(*position)
+    scaling_matrix = create_scaling_matrix(*scaling)
+    rotation_x_matrix = create_rotation_matrix(rotation[0], 1, 0, 0)
+    rotation_y_matrix = create_rotation_matrix(rotation[1], 0, 1, 0)
+    rotation_z_matrix = create_rotation_matrix(rotation[2], 0, 0, 1)
 
-    # Комбинирование матриц в порядке: масштабирование, вращение, затем трансляция
-    transformation_matrix = np.matmul(translation_matrix,  # Применяем трансформации в заданном порядке
-                                      np.matmul(rotation_z_matrix, np.matmul(rotation_y_matrix, np.matmul(rotation_x_matrix, scaling_matrix))))
+    # Комбинирование матриц
+    transformation_matrix = translation_matrix @ rotation_z_matrix @ rotation_y_matrix @ rotation_x_matrix @ scaling_matrix
 
-    glPushMatrix()  # Сохраняем текущую матрицу
-    glMultMatrixf(transformation_matrix.T)  # Умножаем текущую матрицу на преобразовательную
+    # Применение перспективного преобразования
+    aspect_ratio = 800 / 600  # Например, ширина / высота окна
+    perspective_matrix = create_perspective_matrix(45, aspect_ratio, 0.1, 100)
 
-    # Рисуем куб
-    glEnable(GL_DEPTH_TEST)  # Включаем тест глубины для правильного отображения
-    glBegin(GL_QUADS)  # Начинаем рисование квадратов для граней куба
-    for i, face in enumerate(faces):  # Для каждой грани
-        glColor3fv(colors[i])  # Устанавливаем цвет для грани
-        for vertex in face:  # Для каждой вершины грани
-            glVertex3fv(vertices[vertex])  # Устанавливаем координату вершины
-    glEnd()  # Завершаем рисование граней
+    glPushMatrix()
+    glMultMatrixf(perspective_matrix.T)  # Применяем матрицу перспективы
+    glMultMatrixf(transformation_matrix.T)  # Применяем комбинированную матрицу трансформации
+    glEnable(GL_DEPTH_TEST)
 
-    glBegin(GL_LINES)  # Начинаем рисование рёбер
-    for edge in edges:  # Для каждого ребра
-        for vertex in edge:  # Для каждой вершины ребра
-            glVertex3fv(vertices[vertex])  # Устанавливаем координату вершины
-    glEnd()  # Завершаем рисование рёбер
+    # Вычисление и рисование куба
+    glBegin(GL_QUADS)
+    for i, face in enumerate(faces):
+        # Рассчитаем нормали для грани
+        v1 = np.array(vertices[face[1]], dtype=float) - np.array(vertices[face[0]], dtype=float)
+        v2 = np.array(vertices[face[2]], dtype=float) - np.array(vertices[face[0]], dtype=float)
+        normal = np.cross(v1, v2)
+        normal /= np.linalg.norm(normal)  # Нормализация нормали
 
-    glPopMatrix()  # Восстанавливаем предыдущую матрицу
+        # Проверка видимости грани
+        camera_direction = np.array([0.0, 0.0, -1.0], dtype=float)  # Направление взгляда камеры
+        if np.dot(normal, camera_direction) < 0:  # Грань видима
+            glColor3fv(colors[i])  # Задаем цвет
+            for vertex in face:
+                glVertex3fv(vertices[vertex])  # Рисуем вершины
+    glEnd()
 
-# Основная функция программы
+    # Рисуем линии
+    glBegin(GL_LINES)
+    for edge in edges:
+        for vertex in edge:
+            glVertex3fv(vertices[vertex])
+    glEnd()
+
+    glPopMatrix()
+
+
 def main():
-    pygame.init()  # Инициализация Pygame
-    display = (1620-200, 780-150)  # Устанавливаем размер окна
-    pygame.display.set_mode(display, DOUBLEBUF | OPENGL)  # Создаем окно с двойной буферизацией и OpenGL
-    gluPerspective(45, (display[0] / display[1]), 0.1, 50.0)  # Устанавливаем перспективу
-    glTranslatef(0.0, 0.0, -5)  # Сдвигаем камеру по оси Z
+    pygame.init()
+    display = (1620-200, 780-150)
+    pygame.display.set_mode(display, DOUBLEBUF | OPENGL)
+    gluPerspective(45, (display[0] / display[1]), 0.1, 50.0)
+    glTranslatef(0.0, 0.0, -5)
+    position = [0, 0, 0]
+    rotation = [0, 0, 0]
+    scaling = [1, 1, 1]
 
-    # Инициализация параметров куба
-    position = [0, 0, 0]  # Начальная позиция
-    rotation = [0, 0, 0]  # Начальный угол поворота
-    scaling = [1, 1, 1]  # Начальный масштаб
+    while True:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                return
+            if event.type == KEYDOWN:
+                if event.key == K_u: rotation[0] += 5
+                if event.key == K_j: rotation[0] -= 5
+                if event.key == K_i: rotation[1] += 5
+                if event.key == K_k: rotation[1] -= 5
+                if event.key == K_o: rotation[2] += 5
+                if event.key == K_l: rotation[2] -= 5
+                if event.key == K_w: position[1] += 0.1
+                if event.key == K_s: position[1] -= 0.1
+                if event.key == K_a: position[0] -= 0.1
+                if event.key == K_d: position[0] += 0.1
+                if event.key == K_q: position[2] += 0.1
+                if event.key == K_e: position[2] -= 0.1
+                if event.key == K_r: scaling[0] += 0.1
+                if event.key == K_f: scaling[0] -= 0.1
+                if event.key == K_t: scaling[1] += 0.1
+                if event.key == K_g: scaling[1] -= 0.1
+                if event.key == K_y: scaling[2] += 0.1
+                if event.key == K_h: scaling[2] -= 0.1
 
-    while True:  # Главный цикл программы
-        for event in pygame.event.get():  # Обработка событий
-            if event.type == pygame.QUIT:  # Если событие выхода
-                pygame.quit()  # Закрываем Pygame
-                return  # Выходим из функции
-            if event.type == KEYDOWN:  # Если нажата клавиша
-                # Управление вращением
-                if event.key == K_u: rotation[0] += 5  # Вращение Х
-                if event.key == K_j: rotation[0] -= 5  # Вращение Х
-                if event.key == K_i: rotation[1] += 5  # Вращение У
-                if event.key == K_k: rotation[1] -= 5  # Вращение У
-                if event.key == K_o: rotation[2] += 5  # Вращение Z
-                if event.key == K_l: rotation[2] -= 5  # Вращение Z
-                # Управление перемещением
-                if event.key == K_w: position[1] += 0.1  # Перемещение вверх
-                if event.key == K_s: position[1] -= 0.1  # Перемещение вниз
-                if event.key == K_a: position[0] -= 0.1  # Перемещение влево
-                if event.key == K_d: position[0] += 0.1  # Перемещение вправо
-                if event.key == K_q: position[2] += 0.1  # Перемещение вперед
-                if event.key == K_e: position[2] -= 0.1  # Перемещение назад
-                # Управление масштабированием
-                if event.key == K_r: scaling[0] += 0.1  # Увеличение масштаба по X
-                if event.key == K_f: scaling[0] -= 0.1  # Уменьшение масштаба по X
-                if event.key == K_t: scaling[1] += 0.1  # Увеличение масштаба по Y
-                if event.key == K_g: scaling[1] -= 0.1  # Уменьшение масштаба по Y
-                if event.key == K_y: scaling[2] += 0.1  # Увеличение масштаба по Z
-                if event.key == K_h: scaling[2] -= 0.1  # Уменьшение масштаба по Z
-
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)  # Очистка цветового и глубинного буферов
-        draw_axes()  # Рисуем координатные оси
-        draw_cuboid(scaling, position, rotation)  # Рисуем куб с текущими трансформациями
-        pygame.display.flip()  # Обновление окна с новым изображением
-        pygame.time.wait(10)  # Задержка для плавности анимации
-
-if __name__ == "__main__":  # Проверка на запуск скрипта напрямую
-    main()  # Запускаем основную функцию
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+        draw_axes()
+        draw_cuboid(scaling, position, rotation)
+        pygame.display.flip()
+        pygame.time.wait(10)
+if __name__ == "__main__":
+    main()
